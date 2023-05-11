@@ -1,0 +1,69 @@
+import pandas
+import datetime
+
+def ds_assignment(filePath):
+    lines = []
+    with open(filePath, 'rt') as file:
+        for line in file:
+            line = line.rstrip()
+            #skip empty line and comment
+            if line == '' or line[0] == '#':
+                continue
+            lines.append(line)
+
+    #get the list of headers from input file
+    start_of_headers = lines.index('START-OF-FIELDS')
+    end_of_headers = lines.index('END-OF-FIELDS')
+    headers = lines[start_of_headers+1: end_of_headers]
+
+    #get data from input file
+    start_of_data = lines.index('START-OF-DATA')
+    end_of_data = lines.index('END-OF-DATA')
+    lines_of_data = lines[start_of_data+1: end_of_data]
+    data = [line.split('|')[:len(headers)] for line in lines_of_data]
+    df = pandas.DataFrame(data, columns = headers)
+
+    #Limit columns in DataFrame to only those found in reference_fields.csv
+    Path = r'C:\Users\ngyue\Desktop\Temp\DS Assignment 05-2023\DS Assignment 05-2023\reference_fileds.csv'
+    data = pandas.read_csv(Path)
+    ref_headers = data['field'].tolist()
+    common_headers = []
+    for header in headers:
+        if header in ref_headers:
+            common_headers.append(header)
+    df_new = df[common_headers]
+
+    #Create a new dataFrame that includes all securities NOT found in reference_securities.csv
+    Path = r'C:\Users\ngyue\Desktop\Temp\DS Assignment 05-2023\DS Assignment 05-2023\reference_securities.csv'
+    data = pandas.read_csv(Path)
+    ref_ids = data['id_bb_global'].tolist()
+    df_new_with_index = df_new.set_index('ID_BB_GLOBAL', drop = False) #remove duplicates with the same ID_BB_GLOBAL
+    df_new_with_index.drop_duplicates(subset = ['ID_BB_GLOBAL'], keep = 'first')
+    df_new_with_index.drop(ref_ids, errors = 'ignore', inplace = True)
+
+    #new_securities.csv structure should match reference_securities.csv
+    output_headers = []
+    for col in data.columns:
+        output_headers.append(col.upper())
+    df_new_securities = df_new_with_index[output_headers]
+    outputPath = r'C:\Users\ngyue\Desktop\Temp\DS Assignment 05-2023\DS Assignment 05-2023\new_securities.csv'
+    df_new_securities.to_csv(outputPath, index = False)
+
+    #Create security_data.csv
+    headers = ['ID_BB_GLOBAL', 'FIELD', 'VALUE', 'SOURCE', 'TSTAMP']
+    output_list = []
+    df_new_with_index = df_new.set_index('ID_BB_GLOBAL', drop = False)
+    for index, row in df_new_with_index.iterrows():
+        for col in df_new.columns:
+            time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            lst = [index, col, df_new_with_index[col][index], file.name, time]
+            output_list.append(lst)
+    df_security_data = pandas.DataFrame(output_list, columns = headers)
+    outputPath = r'C:\Users\ngyue\Desktop\Temp\DS Assignment 05-2023\DS Assignment 05-2023\security_data.csv'
+    df_security_data.to_csv(outputPath, index = False)
+
+    file.close()
+
+def main():
+    inputPath = r'C:\Users\ngyue\Desktop\Temp\DS Assignment 05-2023\DS Assignment 05-2023\corp_pfd.dif'
+    ds_assignment(inputPath)
